@@ -14,11 +14,10 @@ opts_chunk$set( fig.path = 'figure/' )
 
 The data is loaded and data and time objects are created.
 
-```{r}
+```{r load_data}
 data<-read.csv(unz("activity.zip","activity.csv"))
 data$time<-as.POSIXct(strptime(paste(data$date,formatC(data$interval,digits=3,flag="0")),"%Y-%m-%d %H%M",tz="UTC"))
 data$date<-as.Date(data$date,"%Y-%m-%d")
-
 ```
 
 
@@ -26,7 +25,8 @@ data$date<-as.Date(data$date,"%Y-%m-%d")
 
 ```{r steps_per_day}
 stepPerDay<-tapply(data$steps,data$date,sum,na.rm=TRUE);
-hist(stepPerDay)
+hist(stepPerDay,xlab = "Steps per day",col="red",breaks = 10,main = "Histogram of Steps per day")
+abline(v=mean(stepPerDay),col="blue")
 mean(stepPerDay)
 median(stepPerDay)
 ```
@@ -36,12 +36,13 @@ The mean steps per day is `r mean(stepPerDay)` and the median is `r median(stepP
 ## What is the average daily activity pattern?
 
 ```{r daily_activiy_pattern}
-stepPerInterval<-tapply(data$steps,data$interval,mean,na.rm=TRUE);
-plot(as.numeric(names(stepPerInterval)),stepPerInterval,type="l")
-names(which.max(stepPerInterval))
+library(ggplot2)
+stepPerInterval<-aggregate(steps~interval,data=data,FUN=mean,na.rm=TRUE);
+qplot(interval,steps,data = stepPerInterval,geom="line",ylab = "Number of Steps",xlab = "Interval",main = "Average Steps per interval")
+stepPerInterval$interval[which.max(stepPerInterval$steps)]
 ```
 
-The interval `r names(which.max(stepPerInterval))` has an average of `r max(stepPerInterval)`, that is the maximum interval average.
+The interval `r stepPerInterval$interval[which.max(stepPerInterval$steps)]` has an average of `r max(stepPerInterval$steps)`, that is the maximum interval average.
 
 ## Imputing missing values
 
@@ -51,11 +52,13 @@ summary(data)
 sum(is.na(data$steps))
 auxData<-aggregate(data$steps,by=list(data$interval),FUN = median,na.rm=TRUE)
 names(auxData)<-c("interval","median.steps")
-auxData<-merge(data,auxData)
-auxData$steps[is.na(auxData$steps)]<-auxData$median.steps[is.na(auxData$steps)]
+filledData<-merge(data,auxData)
+filledData$steps[is.na(filledData$steps)]<-filledData$median.steps[is.na(filledData$steps)]
+summary(filledData)
 
-stepPerDayAdj<-tapply(auxData$steps,auxData$date,sum,na.rm=TRUE);
-hist(stepPerDayAdj)
+stepPerDayAdj<-tapply(filledData$steps,filledData$date,sum,na.rm=TRUE);
+hist(stepPerDayAdj,xlab = "Steps per day",col="red",breaks = 10,main = "Histogram of Steps per day")
+abline(v=mean(stepPerDayAdj),col="blue")
 mean(stepPerDayAdj)
 median(stepPerDayAdj)
 ```
@@ -67,10 +70,10 @@ The adjusted mean steps per day is `r mean(stepPerDayAdj)` and the median is `r 
 
 ```{r pattern_weekdays}
 Sys.setlocale("LC_TIME", "C");
-data$weekday=as.factor(ifelse(weekdays(data$time,abbreviate = TRUE) %in% c("Sat","Sun"),"weekday","weekend"));
-data$weekday=relevel(data$weekday,"weekday")
-auxData<-aggregate(steps~interval+weekday,data=data,FUN = mean,na.rm=TRUE)
+filledData$weekday=as.factor(ifelse(weekdays(filledData$time,abbreviate = TRUE) %in% c("Sat","Sun"),"weekday","weekend"));
+filledData$weekday=relevel(filledData$weekday,"weekday")
+filledDataByInterval<-aggregate(steps~interval+weekday,data=filledData,FUN = mean,na.rm=TRUE)
 library(lattice)
-xyplot(steps~interval|weekday,auxData,layou=c(1,2),type="l")
+qplot(interval,steps,data=filledDataByInterval,facets = weekday~.,geom="line",ylab = "Number of Steps",xlab = "Interval",main = "Average number os steps per Interval: Day Pattern")
 ```
 
